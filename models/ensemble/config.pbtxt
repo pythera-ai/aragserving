@@ -1,4 +1,4 @@
-name: "ensemble_model"
+name: "ensemble"
 # maximum batch size 
 max_batch_size: 0 
 platform: "ensemble"
