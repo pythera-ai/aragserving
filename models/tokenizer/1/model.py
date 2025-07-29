@@ -44,13 +44,13 @@ class TritonPythonModel:
                 
                 # Prepare output tensors
                 output_tensors = [
-                    pb_utils.Tensor("input_ids", encodings['input_ids'].astype(np.int32)),
-                    pb_utils.Tensor("attention_mask", encodings['attention_mask'].astype(np.int32))
+                    pb_utils.Tensor("input_ids", encodings['input_ids'].astype(np.int64)),
+                    pb_utils.Tensor("attention_mask", encodings['attention_mask'].astype(np.int64))
                 ]
                 
                 # Include token_type_ids if available (e.g., for BERT)
                 if 'token_type_ids' in encodings:
-                    output_tensors.append(pb_utils.Tensor("token_type_ids", encodings['token_type_ids'].astype(np.int32)))
+                    output_tensors.append(pb_utils.Tensor("token_type_ids", encodings['token_type_ids'].astype(np.int64)))
                 
                 # Create response
                 response = pb_utils.InferenceResponse(output_tensors=output_tensors)
