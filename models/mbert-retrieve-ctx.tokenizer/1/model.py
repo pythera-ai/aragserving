@@ -2,7 +2,8 @@ import json
 import numpy as np
 import triton_python_backend_utils as pb_utils
 from transformers import AutoTokenizer
-import os 
+import os
+
 
 class TritonPythonModel:
     def initialize(self, args):
@@ -11,13 +12,17 @@ class TritonPythonModel:
         # Load parameters from config
         parameters = self.model_config.get('parameters', {})
         self.max_length = int(parameters.get('max_length', {'string_value': '128'})['string_value'])
-        # logger
         self.logger = pb_utils.Logger
-        model_name_or_path = os.path.join(args["model_repository"], args["model_version"])
-        model_name_or_path = model_name_or_path.split('.tokenizer')[0] + '.model'
-        # load model
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
         
+        try:
+            model_name_or_path = os.path.join(args["model_repository"], args["model_version"])
+            model_name_or_path = model_name_or_path.split('.tokenizer')[0] + '.model'
+            # load model
+            self.tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
+            self.logger.log_info("Tokenizer loaded successfully")
+        except Exception as e:
+            raise pb_utils.TritonModelException(f"Failed to load tokenizer: {str(e)}")
+
     def execute(self, requests):
         """Process inference requests and return tokenized outputs."""
         responses = []
