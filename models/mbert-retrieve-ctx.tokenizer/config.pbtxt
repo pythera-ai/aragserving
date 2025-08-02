@@ -1,4 +1,4 @@
-name: "tokenizer"
+name: "mbert-retrieve-ctx.tokenizer"
 backend: "python"
 max_batch_size: 32
 input [
@@ -25,12 +25,7 @@ output [
     dims: [-1]
   }
 ]
-parameters {
-  key: "name_or_path"
-  value {
-    string_value: "bert-base-uncased"
-  }
-}
+
 parameters {
   key: "max_length"
   value {
