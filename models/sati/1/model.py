@@ -8,9 +8,10 @@ class TritonPythonModel:
 
     def initialize(self, args):
         """Initialize the tokenizer based on the config parameters."""
+        self.bls_repository = args['model_repository']
         self.model_version = args['model_version']
-        self.tokenizer_repository = self.model_repository + ".tokenizer"
-        self.model_repository = self.model_repository + ".model"
+        self.tokenizer_repository = self.bls_repository + ".model"
+        self.model_repository = self.bls_repository + ".model"
         self.logger = pb_utils.Logger
 
         # set model_name_or_path

@@ -1,4 +1,4 @@
-name: "mbert.qry"
+name: "mbert-retrieve-qry.model"
 platform: "onnxruntime_onnx"
 default_model_filename: "model.onnx"
 max_batch_size: 0

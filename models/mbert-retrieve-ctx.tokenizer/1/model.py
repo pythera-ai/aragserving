@@ -15,8 +15,8 @@ class TritonPythonModel:
         self.logger = pb_utils.Logger
         
         try:
-            model_name_or_path = os.path.join(args["model_repository"], args["model_version"])
-            model_name_or_path = model_name_or_path.split('.tokenizer')[0] + '.model'
+            model_name_or_path = args["model_repository"].split('.tokenizer')[0] + '.model'
+            model_name_or_path = os.path.join(model_name_or_path, args["model_version"])
             # load model
             self.tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
             self.logger.log_info("Tokenizer loaded successfully")

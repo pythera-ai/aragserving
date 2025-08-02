@@ -1,4 +1,4 @@
-name: "mbert-retrieve-ctx"
+name: "mbert-retrieve-qry"
 max_batch_size: 0 
 platform: "ensemble"
 
@@ -20,7 +20,7 @@ output {
 ensemble_scheduling {
     step [
         {
-            model_name: "mbert-retrieve-ctx.tokenizer"
+            model_name: "mbert-retrieve-qry.tokenizer"
             model_version: -1
             input_map {
                 key: "text_input"
@@ -42,7 +42,7 @@ ensemble_scheduling {
             ]
         },
         {
-          model_name: "mbert-retrieve-ctx.model"
+          model_name: "mbert-retrieve-qry.model"
           model_version: -1
           input_map [
               {
