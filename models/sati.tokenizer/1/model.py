@@ -3,6 +3,11 @@ import numpy as np
 import triton_python_backend_utils as pb_utils
 from transformers import AutoTokenizer
 import os
+import logging
+
+# Configure logger
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 class TritonPythonModel:
@@ -12,14 +17,14 @@ class TritonPythonModel:
         # Load parameters from config
         parameters = self.model_config.get('parameters', {})
         self.max_length = int(parameters.get('max_length', {'string_value': '128'})['string_value'])
-        self.logger = pb_utils.Logger
+        self.logger = logger
         
         try:
             model_name_or_path = args["model_repository"].split('.tokenizer')[0] + '.model'
             model_name_or_path = os.path.join(model_name_or_path, args["model_version"])
             # load model
             self.tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
-            self.logger.log_info("Tokenizer loaded successfully")
+            self.logger.info("Tokenizer loaded successfully")
         except Exception as e:
             raise pb_utils.TritonModelException(f"Failed to load tokenizer: {str(e)}")
 
