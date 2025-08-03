@@ -58,7 +58,7 @@ class TritonPythonModel:
 
         # Create and execute inference request to tokenizer model
         infer_request = pb_utils.InferenceRequest(
-            model_name="tokenizer",
+            model_name="mbert.rerank.tokenizer",
             requested_output_names=requested_outputs,
             inputs=inputs
         )
@@ -91,7 +91,7 @@ class TritonPythonModel:
 
         # Create and execute inference request to platform model
         infer_request = pb_utils.InferenceRequest(
-            model_name="platform",
+            model_name="mbert.rerank.model",
             requested_output_names=requested_outputs,
             inputs=inputs
         )
@@ -142,6 +142,7 @@ class TritonPythonModel:
 
                 # Step 2: Call platform model via helper function
                 logits = self._call_model_platform(input_ids, attention_mask, token_type_ids)
+                logger.info(f"Logits shape: {logits.shape}, dtype: {logits.dtype}")
 
                 # For simplicity, flatten logits to 1D array of scores
                 scores = logits.flatten().astype(np.float32)
