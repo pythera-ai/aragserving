@@ -3,6 +3,10 @@ import numpy as np
 from typing import List
 from transformers import AutoTokenizer
 import os
+import logging
+# Configure logger
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 class TritonPythonModel:
 
@@ -10,12 +14,13 @@ class TritonPythonModel:
         """Initialize the tokenizer based on the config parameters."""
         self.bls_repository = args['model_repository']
         self.model_version = args['model_version']
-        self.tokenizer_repository = self.bls_repository + ".model"
-        self.model_repository = self.bls_repository + ".model"
-        self.logger = pb_utils.Logger
+        self.tokenizer_repository = self.bls_repository.split("/")[-1] + ".tokenizer"
+        self.model_repository = self.bls_repository.split("/")[-1] + ".model"
+        self.logger = logger
 
         # set model_name_or_path
-        model_name_or_path = os.path.join(self.tokenizer_repository, self.model_version)
+        model_name_or_path = self.bls_repository + ".model"
+        model_name_or_path = os.path.join(model_name_or_path, self.model_version)
         self.tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
     
 
