@@ -2,3 +2,9 @@ trism
 tritonclient[all]
 attrdict
 transformers
+fastapi
+uvicorn[standard]
+python-multipart
+python-docx
+pydantic
+numpy
