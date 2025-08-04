@@ -74,7 +74,7 @@ pip install -r requirements.txt
 
 ```bash
 # Start the API server
-python backendapi.py
+python src/api/v1.py
 
 # Or use the startup script
 chmod +x start_api.sh
@@ -82,8 +82,8 @@ chmod +x start_api.sh
 
 # The API will be available at:
 # API: http://localhost:8080
-# Documentation: http://localhost:8080/docs
-# ReDoc: http://localhost:8080/redoc
+# FastAPI Documentation: http://localhost:8080/docs
+# API Documentation: docs/API.md
 ```
 
 ### 4. Test the API
