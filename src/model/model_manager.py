@@ -11,15 +11,16 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class ModelManager:
-    def __init__(self):
+    def __init__(self, model_config: Dict[str, Any]):
+        self.model_config = model_config
         self.models = {}
         self._initialize_models()
-        self.context_embedding_length = 512 # model_max_length of context embedding model
-    
+        self.context_embedding_length = model_config.get("retrieve_context", {}).get("max_length", 512) # model_max_length of context embedding model
+
     def _initialize_models(self):
         """Initialize all Triton models"""
         try:
-            for model_key, config in MODEL_CONFIG.items():
+            for model_key, config in self.model_config.items():
                 logger.info(f"Initializing {model_key} model...")
                 self.models[model_key] = TritonModel(
                     model=config["name"],

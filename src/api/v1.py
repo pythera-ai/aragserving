@@ -13,6 +13,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, validator
 import uvicorn
 
+from src.model.model_manager import ModelManager
+from src.utils.utils import prepare_text_input, extract_text_from_file, generate_md5_hash
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -41,7 +44,8 @@ MODEL_CONFIG = {
         "name": "mbert-retrieve-ctx",
         "version": 1,
         "url": TRITON_SERVER_URL,
-        "grpc": False
+        "grpc": False,
+        "max_length": 512  # model_max_length of context embedding model
     },
     "rerank": {
         "name": "mbert.rerank",
@@ -99,7 +103,7 @@ class ErrorResponse(BaseModel):
 
 
 # Initialize model manager
-model_manager = ModelManager()
+model_manager = ModelManager(model_config=MODEL_CONFIG)
 
 ####################
 # FastAPI App
