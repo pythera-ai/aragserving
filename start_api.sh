@@ -52,4 +52,4 @@ except Exception as e:
 
 # Start the API server
 echo "🌟 Starting FastAPI server..."
-python3 backendapi.py
+python3 -m src.api.v1

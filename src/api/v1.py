@@ -369,7 +369,7 @@ if __name__ == "__main__":
     
     # Start server
     uvicorn.run(
-        "backendapi:app",
+        "src.api.v1:app",
         host="0.0.0.0",
         port=API_PORT,
         reload=False,
