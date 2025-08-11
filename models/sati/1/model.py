@@ -8,6 +8,7 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
 class TritonPythonModel:
 
     def initialize(self, args):
@@ -16,41 +17,46 @@ class TritonPythonModel:
         self.model_version = args['model_version']
         self.tokenizer_repository = self.bls_repository.split("/")[-1] + ".tokenizer"
         self.model_repository = self.bls_repository.split("/")[-1] + ".model"
-        self.logger = logger
+        # Get tokenizer folders path
+        tokenizer_folder_path = self.bls_repository + ".tokenizer"
+        self.tokenizer_folder_path = os.path.join(tokenizer_folder_path, self.model_version)
+        self.logger = logging.getLogger(__name__)
 
-        # set model_name_or_path
-        model_name_or_path = self.bls_repository + ".model"
-        model_name_or_path = os.path.join(model_name_or_path, self.model_version)
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
-    
+    def _call_tokenizers(self, text: np.ndarray, tokenizer_name: np.ndarray):
+            """
+            Calls the tokenizer model to get input_ids, attention_mask, and token_type_ids.
+            Assumes one query repeated for multiple contexts.
+            """
+            text = np.array([text.encode("utf-8")],  dtype=object)
+            tokenizer_name = tokenizer_name.as_numpy()
 
-    def _call_tokenizer_model(self, text, tokenizer_name=None):
-        """Call tokenizer model through Triton inference"""
-        inputs = [pb_utils.Tensor("text", np.array([text], dtype=np.object_))]
-        
-        if tokenizer_name:
-            inputs.append(pb_utils.Tensor("tokenizer_name", np.array([tokenizer_name], dtype=np.object_)))
-        
-        tokenizer_request = pb_utils.InferenceRequest(
-            model_name=self.tokenizer_repository,
-            requested_output_names=["input_ids", "attention_mask", "token_type_ids"],
-            inputs=inputs
-        )
-        
-        tokenizer_response = tokenizer_request.exec()
-        if tokenizer_response.has_error():
-            raise Exception(f"Tokenizer model error: {tokenizer_response.error().message()}")
-        
-        input_ids_tensor = pb_utils.get_output_tensor_by_name(tokenizer_response, "input_ids")
-        attention_mask_tensor = pb_utils.get_output_tensor_by_name(tokenizer_response, "attention_mask")
-        
-        input_ids = input_ids_tensor.as_numpy()
-        attention_mask = attention_mask_tensor.as_numpy()
-        
-        return {
-            "input_ids": input_ids,
-            "attention_mask": attention_mask
-        }
+
+            # Create Triton tensors (note: strings are handled as object dtype with bytes)
+            inputs = [pb_utils.Tensor("text", text), pb_utils.Tensor("tokenizer_name", tokenizer_name)]
+
+            # Requested outputs
+            requested_outputs = ["input_ids", "attention_mask", "token_type_ids"]
+
+            # Create and execute inference request to tokenizer model
+            infer_request = pb_utils.InferenceRequest(
+                model_name="sati.tokenizer",
+                requested_output_names=requested_outputs,
+                inputs=inputs
+            )
+            infer_response = infer_request.exec()
+
+            if infer_response.has_error():
+                # raise RuntimeError(f"Tokenizer inference failed: {infer_response.error().message()}")
+                self.logger.error(f"Tokenizer inference failed: {infer_response.error().message()}")
+            # Extract outputs
+            input_ids = pb_utils.get_output_tensor_by_name(infer_response, "input_ids").as_numpy()
+            attention_mask = pb_utils.get_output_tensor_by_name(infer_response, "attention_mask").as_numpy()
+
+            return {
+                "input_ids": input_ids,
+                "attention_mask": attention_mask
+            }
+
 
 
     def execute(self, requests):
@@ -82,8 +88,12 @@ class TritonPythonModel:
             else:
                 self.logger.info(f"Using default max_tokens: {max_tokens}")
 
+
+            # Get tokenizer_name
+            tokenizer_name_tensor = pb_utils.get_input_tensor_by_name(request, "tokenizer_name")
+
             # Call tokenizer
-            encoded = self._call_tokenizer_model(text)
+            encoded = self._call_tokenizers(text, tokenizer_name=tokenizer_name_tensor )
                 
             # get input_ids and log total tokens
             input_ids = encoded["input_ids"][0]  # 1-D array của token IDs
@@ -168,25 +178,35 @@ class TritonPythonModel:
             prev = 0
             
             self.logger.info(f"Found {len(text_responses)} sentence boundaries")
-            
+
+            # Load tokenizer from model_path
+
+            try:
+                tokenizer_name = tokenizer_name_tensor.as_numpy().flatten()[0].decode('utf-8')
+                tokenizer = AutoTokenizer.from_pretrained(os.path.join(self.tokenizer_folder_path, tokenizer_name))   
+                logger.info(f"Successfully loaded tokenizer for decode: {tokenizer_name}")
+            except:
+                self.logger.info(f'Can not load tokenizer from {tokenizer_name}')
+
+
             if not text_responses:
                 # No boundaries found, decode entire text
                 tokens = encoded["input_ids"][0][:]
-                chunks.append(self.tokenizer.decode(tokens.tolist()))
+                chunks.append(tokenizer.decode(tokens.tolist()))
                 self.logger.info(f"No boundaries found, returning full text as single chunk")
             else:
                 # Decode chunks based on found boundaries 
                 for idx in text_responses:
                     if idx > prev:  # Thêm check này để tránh duplicate
                         tokens = input_ids[prev:idx]
-                        decoded_chunk = self.tokenizer.decode(tokens.tolist())
+                        decoded_chunk = tokenizer.decode(tokens.tolist())
                         chunks.append(decoded_chunk)
                         prev = idx
                 
                 # Don't forget the tail chunk 
                 if prev < total_len:
                     tail_tokens = input_ids[prev:]
-                    tail_str = self.tokenizer.decode(tail_tokens.tolist())
+                    tail_str = tokenizer.decode(tail_tokens.tolist())
                     if tail_str:
                         chunks.append(tail_str)
             
@@ -195,7 +215,7 @@ class TritonPythonModel:
            
             
             # Apply merge with max_tokens of model's max_length
-            chunks = self.merge_subtexts_fix(self.tokenizer, chunks, max_tokens=max_tokens)
+            chunks = self.merge_subtexts_fix(tokenizer, chunks, max_tokens=max_tokens)
 
             # Create output tensor of strings
             out_bytes = [c.encode("utf-8") for c in chunks]
@@ -231,3 +251,4 @@ class TritonPythonModel:
     
     def finalize(self):
         print("Finalizing...")
+

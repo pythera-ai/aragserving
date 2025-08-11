@@ -4,9 +4,14 @@ platform: "ensemble"
 
 input [
 {
-    name: "text_input"
+    name: "text"
     data_type: TYPE_STRING
     dims: [ -1 , -1] 
+},
+{
+    name: "tokenizer_name"
+    data_type: TYPE_STRING
+    dims: [-1]
 }
 ]
 
@@ -22,10 +27,14 @@ ensemble_scheduling {
         {
             model_name: "mbert-retrieve-qry.tokenizer"
             model_version: -1
-            input_map {
-                key: "text_input"
-                value: "text_input"
-            }
+            input_map [{
+                key: "text"
+                value: "text"
+            },
+            {
+                key: "tokenizer_name"
+                value: "tokenizer_name"
+            }]
             output_map [
                 {
                     key: "input_ids"

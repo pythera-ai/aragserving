@@ -1,28 +1,33 @@
 name: "mbert-retrieve-ctx.tokenizer"
 backend: "python"
-max_batch_size: 32
+max_batch_size: 0
 input [
-  {
-    name: "text_input"
+{
+    name: "text"
     data_type: TYPE_STRING
-    dims: [1]
-  }
+    dims: [ -1 , -1] 
+},
+{
+    name: "tokenizer_name"
+    data_type: TYPE_STRING
+    dims: [-1]
+}
 ]
 output [
   {
     name: "input_ids"
     data_type: TYPE_INT64
-    dims: [-1]
+    dims: [-1,-1]
   },
   {
     name: "attention_mask"
     data_type: TYPE_INT64
-    dims: [-1]
+    dims: [-1,-1]
   },
   {
     name: "token_type_ids"
     data_type: TYPE_INT64
-    dims: [-1]
+    dims: [-1,-1]
   }
 ]
 

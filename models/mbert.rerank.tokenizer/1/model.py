@@ -1,108 +1,81 @@
-
-
-
 import json
 import numpy as np
+import os 
 import triton_python_backend_utils as pb_utils
+from huggingface_hub import login, snapshot_download
+
+from typing import List , Dict , Any
+import logging
 from transformers import AutoTokenizer
-import os
+import ast
+import dotenv
+dotenv.load_dotenv()
+# Configure logger
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+HF_TOKEN = os.getenv('HF_TOKEN')
+
 
 class TritonPythonModel:
-    def initialize(self, args):
-        """Initialize basic params."""
-        self.model_config = json.loads(args['model_config'])
-        parameters = self.model_config.get('parameters', {})
-        
-        self.model_version = args["model_version"]
-        self.model_repository = args["model_repository"]
-        self.model_path = os.path.join(self.model_repository, str(self.model_version))  # Fallback nếu cần
-        
-        self.max_length = int(parameters.get('max_length', {'string_value': '512'})['string_value'])
-        self.logger = pb_utils.Logger
-        
-        self.tokenizer_cache = {} # Cache tokenizer 
+    
+    """
+    This pipeline is use to call the tokenizer model and return the input_ids, attention_mask, token_type_ids
+    """
+
+    def initialize(self, args: Dict[str, Any]) -> None:
+
+        self.model_config = args['model_config']
+        self.model_version = args['model_version']
+        self.model_path = args['model_repository'] + '/' + args['model_version']
 
     def execute(self, requests):
+        """Process inference requests and return tokenized outputs."""
         responses = []
         
         for request in requests:
             try:
-                model_name_or_path_tensor = pb_utils.get_input_tensor_by_name(request, "model_name_or_path")
-                if model_name_or_path_tensor is None:
-                    raise ValueError("model_name_or_path input is required to specify the tokenizer")
+
+                # Get input text)
+                input_tensor = pb_utils.get_input_tensor_by_name(request, "text")
+                input_texts = input_tensor.as_numpy()  # Shape: [batch_size, 1]
+
+                # Flatten and decode the input texts
+                input_texts = [text.decode('utf-8') for text in input_texts.flatten()]
                 
-                model_name_or_path_np = model_name_or_path_tensor.as_numpy().flatten()
-                model_name_or_path = model_name_or_path_np[0].decode('utf-8') if isinstance(model_name_or_path_np[0], bytes) else str(model_name_or_path_np[0])
+                query_list, context_list = self.split_query_context(input_texts)
+              
+                # Get tokenizer name 
+                tokenizer_name_tensor = pb_utils.get_input_tensor_by_name(request, 'tokenizer_name')
+
+                tokenizer_name = tokenizer_name_tensor.as_numpy().flatten()[0].decode('utf-8')
                 
-                if model_name_or_path not in self.tokenizer_cache:
-                    # self.logger.log_info(f"Loading tokenizer from: {model_name_or_path}")
-                    try:
-                        tokenizer = AutoTokenizer.from_pretrained('/models/mbert.rerank.tokenizer/1')
-                        self.tokenizer_cache[model_name_or_path] = tokenizer
-                        # self.logger.log_info(f"Tokenizer for {model_name_or_path} loaded and cached successfully")
-                    except Exception as e:
-                        raise pb_utils.TritonModelException(f"Failed to load tokenizer from {model_name_or_path}: {str(e)}")
+                tokenizer_save_dir = os.path.join(self.model_path, tokenizer_name)
+                
+                if os.path.exists(tokenizer_save_dir):
+                    logger.info(f"Tokenizer already downloaded: {tokenizer_name}")
                 else:
-                    self.logger.log_info(f"Using cached tokenizer for: {model_name_or_path}")
+                    self.download_tokenizer(tokenizer_name,tokenizer_save_dir)
+
+                # Load tokenizer from model_path
+                try:
+                    tokenizer = AutoTokenizer.from_pretrained(tokenizer_save_dir)
+                    logger.info(f"Successfully loaded tokenizer: {tokenizer_name}")
+                except:
+                    logger.info(f"Failed to load tokenizer: {tokenizer_name}")
                 
-                tokenizer = self.tokenizer_cache[model_name_or_path]  # Sử dụng tokenizer đã load
+                # Tokenize the input texts - NO TRUNCATION for long documents
                 
-                query_tensor = pb_utils.get_input_tensor_by_name(request, "query")
-                context_tensor = pb_utils.get_input_tensor_by_name(request, "context")
-                use_for_tensor = pb_utils.get_input_tensor_by_name(request, "use_for")
-                
-                if use_for_tensor is None:
-                    raise ValueError("use_for input is required to specify the mode")
-                
-                mode_np = use_for_tensor.as_numpy().flatten()
-                mode = mode_np[0].decode('utf-8') if isinstance(mode_np[0], bytes) else str(mode_np[0])
-                
-                if mode == "query":
-                    if query_tensor is None:
-                        raise ValueError(f"Query input is required for {mode} mode")
-                    if context_tensor is not None:
-                        self.logger.log_info(f"Ignoring provided context in {mode} mode (only used for rerank)")
-                    texts = [q.decode('utf-8') if isinstance(q, bytes) else str(q) for q in query_tensor.as_numpy().flatten()]
-                    self.logger.log_info(f"Tokenizing {len(texts)} texts in {mode} mode")
-                    encodings = tokenizer(
-                        texts,
-                        max_length=self.max_length,
-                        padding=True,
-                        truncation=True,
-                        return_tensors='np'
-                    )
-                
-                elif mode == "rerank":
-                    if query_tensor is None:
-                        raise ValueError("Query input is required for rerank mode")
-                    if context_tensor is None:
-                        raise ValueError("Context input is required for rerank mode")
-                    queries_np = query_tensor.as_numpy().flatten()
-                    contexts_np = context_tensor.as_numpy().flatten()
-                    queries = [q.decode('utf-8') if isinstance(q, bytes) else str(q) for q in queries_np]
-                    contexts = [c.decode('utf-8') if isinstance(c, bytes) else str(c) for c in contexts_np]
-                    
-                    if len(queries) == 1:
-                        query_list = [queries[0]] * len(contexts)
-                    else:
-                        if len(queries) != len(contexts):
-                            raise ValueError("Number of queries must match number of contexts in rerank mode")
-                        query_list = queries
-                    
-                    self.logger.log_info(f"Tokenizing {len(query_list)} query-context pairs in rerank mode")
-                    encodings = tokenizer(
-                        query_list,
-                        contexts,
-                        max_length=self.max_length,
-                        padding=True,
-                        truncation=True,
-                        return_tensors='np'
-                    )
-                
-                else:
-                    raise ValueError(f"Invalid use_for mode: {mode}. Supported: 'query', 'rerank'")
-                
-                # Prepare output tensors
+                encodings = tokenizer(
+                    query_list,
+                    context_list,
+                    # max_length=None,  # No max length limit
+                    padding=True,    # No padding for variable length
+                    truncation=True, # No truncation
+                    return_tensors='np' # Return NumPy arrays
+                    # add_special_tokens=False
+                )
+
+                # Create dummy input_ids and attention_mask
                 batch_size = encodings['input_ids'].shape[0]
                 output_tensors = [
                     pb_utils.Tensor("input_ids", encodings['input_ids'].astype(np.int64)),
@@ -116,17 +89,45 @@ class TritonPythonModel:
                 
                 response = pb_utils.InferenceResponse(output_tensors=output_tensors)
                 responses.append(response)
+
                 
+                # Ensure proper shape - add batch dimension if needed
+
             except Exception as e:
-                self.logger.log_error(f"Error processing request: {str(e)}")
                 error = pb_utils.TritonError(f"Error processing request: {str(e)}")
                 responses.append(pb_utils.InferenceResponse(error=error))
         
         return responses
+    
+    def split_query_context(self, input_texts):
 
+        # convert string to list 
+        list_combine= ast.literal_eval(input_texts[0])    
+
+        # get context
+        context_list = list_combine[1]
+
+        # get query and repeat it for each context
+        query_list = list_combine[0] * len(context_list)
+
+
+        return query_list, context_list
+    
+    def download_tokenizer(self,tokenizer_name:str,save_dir:str):
+
+        """
+        Download tokenizer from huggingface hub
+
+        Args:
+            tokenizer_name (str): name of the tokenizer
+            save_dir (str): directory to save the tokenizer
+            token (str): huggingface token
+        """
+
+        snapshot_download(repo_id=tokenizer_name, local_dir=save_dir, token= HF_TOKEN,
+                        allow_patterns=["config.json", "vocab.txt", "tokenizer_config.json", "special_tokens_map.json", "tokenizer.json"],
+                    )
 
     def finalize(self):
         """Clean up resources."""
-        self.logger.log_info("Cleaning up tokenizer model")
-        self.tokenizer_cache = {}
-        self.logger.log_info("Tokenizer model cleaned up")
+        logger.info("Cleaning up ")

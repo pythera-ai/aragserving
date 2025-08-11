@@ -4,30 +4,23 @@ import triton_python_backend_utils as pb_utils
 from transformers import AutoTokenizer
 import os
 import logging
+from huggingface_hub import login, snapshot_download
 
 # Configure logger
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+import dotenv
+dotenv.load_dotenv()
+HF_TOKEN = os.getenv('HF_TOKEN')
 
 
 class TritonPythonModel:
     def initialize(self, args):
         """Initialize the tokenizer based on the config parameters."""
         self.model_config = json.loads(args['model_config'])
-        # Load parameters from config
-        parameters = self.model_config.get('parameters', {})
-        self.max_length = int(parameters.get('max_length', {'string_value': '128'})['string_value'])
+        self.model_version = args['model_version']
+        self.model_path = args['model_repository'] + '/' + args['model_version']
         self.logger = logger
-        
-        try:
-            model_name_or_path = args["model_repository"].split('.tokenizer')[0] + '.model'
-            model_name_or_path = os.path.join(model_name_or_path, args["model_version"])
-            # load model
-            self.tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
-            self.logger.info("Tokenizer loaded successfully")
-        except Exception as e:
-            raise pb_utils.TritonModelException(f"Failed to load tokenizer: {str(e)}")
-
 
     def execute(self, requests):
         """Process inference requests and return tokenized outputs."""
@@ -42,14 +35,39 @@ class TritonPythonModel:
                 # Flatten and decode the input texts
                 input_texts = [text.decode('utf-8') for text in input_texts.flatten()]
                 
+                # Get tokenizer name from input
+
+                tokenizer_name_tensor = pb_utils.get_input_tensor_by_name(request, 'tokenizer_name')
+                tokenizer_name = tokenizer_name_tensor.as_numpy().flatten()[0].decode('utf-8')
+
+                # Save tokenizer to save dir 
+                tokenizer_save_dir = os.path.join(self.model_path, tokenizer_name)
+
+                if os.path.exists(tokenizer_save_dir):
+                    logger.info(f"Tokenizer already downloaded: {tokenizer_name}")
+                else:
+                    self.download_tokenizer(tokenizer_name,tokenizer_save_dir)
+                logger.info(f'Tokenizer saved to {tokenizer_save_dir}')
+                # Load tokenizer from model_path
+                try:
+                    tokenizer = AutoTokenizer.from_pretrained(tokenizer_save_dir)
+                    logger.info(f"Successfully loaded tokenizer: {tokenizer_name}")
+                except: 
+                    logger.info(f"Failed to load tokenizer: {tokenizer_name}")
                 # Tokenize the input texts - NO TRUNCATION for long documents
-                encodings = self.tokenizer(
-                    input_texts,
-                    padding=False,    # No padding for variable length
-                    truncation=False, # No truncation
-                    return_tensors='np',  # Return NumPy arrays
-                    add_special_tokens=False
-                )
+                try:
+                    encodings = tokenizer(
+                        input_texts,
+                        padding=False,    # No padding for variable length
+                        truncation=False, # No truncation
+                        return_tensors='np',  # Return NumPy arrays
+                        add_special_tokens=False
+                    )
+                    self.logger.info(f'Sucessfully tokenizer text')
+                except Exception as e:
+                    error = pb_utils.TritonError(f"Error processing request: {str(e)}")
+                    responses.append(pb_utils.InferenceResponse(error=error))
+
                 
                 # Ensure proper shape - add batch dimension if needed
                 input_ids = encodings['input_ids']
@@ -87,3 +105,20 @@ class TritonPythonModel:
         self.logger.info("Cleaning up tokenizer model")
         self.tokenizer = None
         self.logger.info("Tokenizer model cleaned up")
+
+
+    def download_tokenizer(self,tokenizer_name:str,save_dir:str):
+
+            """
+            Download tokenizer from huggingface hub
+
+            Args:
+                tokenizer_name (str): name of the tokenizer
+                save_dir (str): directory to save the tokenizer
+                token (str): huggingface token
+            """
+
+            snapshot_download(repo_id=tokenizer_name, local_dir=save_dir, token= HF_TOKEN,
+                            allow_patterns=["config.json", "vocab.txt", "tokenizer_config.json", "special_tokens_map.json", "tokenizer.json"],
+                        )
+            
