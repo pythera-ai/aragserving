@@ -1,5 +1,6 @@
 from trism import TritonModel
 import numpy as np
+from sklearn.metrics.pairwise import cosine_similarity
 
 model = TritonModel(
 
@@ -19,12 +20,12 @@ model_name = np.array([model_name], dtype=object)
 # query_texts = ["What is the capital of France?"]
 # query_bytes = [text.encode("utf-8") for text in query_texts]
 context_texts = [
-    "Paris is the capital of France.",
-    "France is a country in Europe.",
-    "The Eiffel Tower is in Paris."
+    "His name is Grow.",
+    "Tên con chó là .",
+    "Thủ đô của pháp là Việt Nam"
 ] 
 
-input_merge = []
+input_merge = ['Con chó tên là gì?']
 # input_merge.append(query_texts)
 input_merge.append(context_texts)
 
@@ -40,4 +41,4 @@ print(input_merge.shape)
 data_input = [input_merge, model_name]
 
 tokenizer_output = model.run(data=data_input)
-print("Output for  model:", tokenizer_output)
+# print("Output for  model:", tokenizer_output.shape)

@@ -1,0 +1,68 @@
+name: "qwen3-retrieve-sym"
+max_batch_size: 0 
+platform: "ensemble"
+
+input [
+{
+    name: "text"
+    data_type: TYPE_STRING
+    dims: [ -1 ] 
+},
+{
+    name: "tokenizer_name"
+    data_type: TYPE_STRING
+    dims: [-1]
+}]
+
+output {
+    name: "sentence_embedding_quantized"
+    data_type: TYPE_UINT8
+    dims: [ -1, 1024]
+}
+
+
+ensemble_scheduling {
+    step [
+        {
+            model_name: "qwen3-retrieve-sym.tokenizer"
+            model_version: -1
+            input_map [{
+                key: "text"
+                value: "text"
+            },
+            {
+                key: "tokenizer_name"
+                value: "tokenizer_name"
+            }]
+            output_map [
+                {
+                    key: "input_ids"
+                    value: "input_ids"
+                },
+                {
+                    key: "attention_mask"
+                    value: "attention_mask"
+                }
+               
+            ]
+        },
+        {
+          model_name: "qwen3-retrieve-sym.model"
+          model_version: -1
+          input_map [
+              {
+                    key: "input_ids"
+                    value: "input_ids"
+              },
+              {
+                  key: "attention_mask"
+                  value: "attention_mask"
+              }
+          ]
+          output_map {
+              key: "sentence_embedding_quantized"
+              value: "sentence_embedding_quantized"
+          }
+        }
+    ]
+}

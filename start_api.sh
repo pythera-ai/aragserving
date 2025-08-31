@@ -16,9 +16,9 @@ if ! command -v pip3 &> /dev/null; then
     exit 1
 fi
 
-# Install requirements if needed
-echo "📦 Installing dependencies..."
-pip3 install -r requirements.txt
+# # Install requirements if needed
+# echo "📦 Installing dependencies..."
+# pip3 install -r requirements.txt
 
 # Set environment variables
 export TRITON_SERVER_URL=${TRITON_SERVER_URL:-"localhost:7000"}

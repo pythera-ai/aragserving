@@ -1,0 +1,30 @@
+# ONNX model files
+*.onnx
+
+# pythera folders
+**/pythera/
+
+# Configuration files
+.env
+.env.*
+!.env.example
+
+# Python/__pycache__ files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp

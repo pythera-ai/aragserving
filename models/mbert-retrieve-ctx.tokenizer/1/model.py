@@ -33,10 +33,10 @@ class TritonPythonModel:
                 input_tensor = pb_utils.get_input_tensor_by_name(request, "text")
                 input_texts = input_tensor.as_numpy()  # Shape: [batch_size, 1]
                 
-                # Flatten and decode the input texts
                 input_texts = [text.decode('utf-8') for text in input_texts.flatten()]
                 
-                  # Get tokenizer name from input
+
+                # Get tokenizer name from input
 
                 tokenizer_name_tensor = pb_utils.get_input_tensor_by_name(request, 'tokenizer_name')
                 tokenizer_name = tokenizer_name_tensor.as_numpy().flatten()[0].decode('utf-8')
@@ -61,7 +61,8 @@ class TritonPythonModel:
                         input_texts,
                         padding='max_length',
                         truncation=True,
-                        return_tensors='np'  # Return NumPy arrays
+                        # max_length=max_length,
+                        return_tensors='np'  
                     )
                 except Exception as e:
                     error = pb_utils.TritonError(f"Error processing request: {str(e)}")
