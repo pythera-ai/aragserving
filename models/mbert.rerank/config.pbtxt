@@ -1,0 +1,24 @@
+name: "mbert.rerank"
+backend: "python"
+max_batch_size: 0
+
+input [
+  {
+    name: "text"
+    data_type: TYPE_STRING
+    dims: [-1]
+  },
+  {
+    name: "tokenizer_name"
+    data_type: TYPE_STRING
+    dims: [-1]
+  }
+]
+
+output [
+  {
+    name: "logits"
+    data_type: TYPE_FP32
+    dims: [-1]
+  }
+]

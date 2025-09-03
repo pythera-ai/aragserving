@@ -1,6 +1,8 @@
 
 services:
   tritonserver:
+    env_file:
+      - .env
     # image: hieupth/tritonserver:25.04	
     build:
       context: .
