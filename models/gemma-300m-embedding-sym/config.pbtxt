@@ -1,0 +1,69 @@
+name: "gemma-300m-embedding-sym"
+platform: "ensemble"
+max_batch_size: 0
+version_policy: {
+  all: {
+  }
+}
+
+input [
+  {
+    name: "text"
+    data_type: TYPE_STRING
+    dims: [ -1 ]
+  },
+  {
+    name: "tokenizer_name"
+    data_type: TYPE_STRING
+    dims: [ -1 ]
+  }
+]
+
+output [
+  {
+    name: "sentence_embedding"
+    data_type: TYPE_FP32
+    dims: [ -1, 768 ]
+  }
+]
+
+ensemble_scheduling {
+  step [
+    {
+      model_name: "gemma-300m-embedding-sym.tokenizer"
+      model_version: -1
+      input_map {
+        key: "text"
+        value: "text"
+      }
+      input_map {
+        key: "tokenizer_name"
+        value: "tokenizer_name"
+      }
+      output_map {
+        key: "input_ids"
+        value: "input_ids"
+      }
+      output_map {
+        key: "attention_mask"
+        value: "attention_mask"
+      }
+    },
+    {
+      model_name: "gemma-300m-embedding-sym.model"
+      model_version: -1
+      input_map {
+        key: "input_ids"
+        value: "input_ids"
+      }
+      input_map {
+        key: "attention_mask"
+        value: "attention_mask"
+      }
+      output_map {
+        key: "sentence_embedding"
+        value: "sentence_embedding"
+      }
+    }
+  ]
+}

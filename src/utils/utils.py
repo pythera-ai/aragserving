@@ -48,6 +48,22 @@ def prepare_input_format(list_text:List,  expand_dims:bool = False) -> np.array:
         input_array = np.expand_dims(input_array, axis=0)
     return input_array
 
+def prepare_input_format_for_specific_embedding(list_text:List[str]) -> np.array:
+    """Prepare input format for specific embedding model"""
+
+    # Đảm bảo tất cả text đều là string và encode UTF-8
+    object_text = []
+    for text in list_text:
+        if isinstance(text, str):
+            # Encode UTF-8 để tránh lỗi ASCII
+            object_text.append(text.encode('utf-8'))
+        else:
+            # Convert to string nếu không phải string và encode UTF-8
+            object_text.append(str(text).encode('utf-8'))
+
+    input_array = np.array(object_text, dtype=object)
+    return input_array
+
 def prepare_rerank_input(query_texts: List[str], context_texts: List[str]) -> List[str]:
     """Prepare input format for Triton model"""
     input_merge = []
