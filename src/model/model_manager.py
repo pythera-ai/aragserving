@@ -6,7 +6,7 @@ from typing import List, Dict, Any, Optional
 import numpy as np
 from fastapi import HTTPException
 
-from src.utils.utils import extract_text_from_file, generate_md5_hash, prepare_input_format, prepare_input_for_tokenizer, prepare_rerank_input, extract_tokenizer_name
+from src.utils.utils import extract_text_from_file, generate_md5_hash, prepare_input_format, prepare_input_for_tokenizer, prepare_rerank_input, extract_tokenizer_name, prepare_input_format_for_specific_embedding
 
 # logger configuration
 logging.basicConfig(level=logging.INFO)
@@ -58,14 +58,18 @@ class ModelManager:
             sentences = text_str.split('. ')
             return [s.strip() + '.' for s in sentences if s.strip()]
     
-    def get_query_embeddings(self, text: List[str]) -> np.ndarray:
+    def get_query_embeddings(self, text: List[str], model_name: str) -> np.ndarray:
         """Get embeddings for query text"""
         try:
-            tokenizer_name = extract_tokenizer_name(self.tokenizer_config, "retrieve_query")
+            tokenizer_name = extract_tokenizer_name(self.tokenizer_config, model_name)
             input_tokenizer_array = prepare_input_for_tokenizer(tokenizer_name)
-            input_data = prepare_input_format(text, expand_dims= True)
-            result = self.models["retrieve_query"].run(data=[input_data, input_tokenizer_array])
-            return result["embedding"]
+            if 'qwen' or 'gemma' in model_name: # qwen model have input shape 1 
+                input_data = prepare_input_format_for_specific_embedding(text)
+            else: # mbert model have input shape 1,1
+                input_data = prepare_input_format(text, expand_dims= True)
+            result = self.models[model_name].run(data=[input_data, input_tokenizer_array])
+            first_key = next(iter(result.keys()))
+            return result[first_key] 
         except Exception as e:
             logger.error(f"Query embedding failed: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Query embedding failed: {str(e)}")
