@@ -57,7 +57,19 @@ MODEL_CONFIG = {
         "version": 1,
         "url": TRITON_SERVER_URL,
         "grpc": False
-    }
+    },
+    'qwen3-retrieve-sym': {
+        "name": "qwen3-retrieve-sym",
+        "version": 1,
+        "url": TRITON_SERVER_URL,
+        "grpc": False
+    },
+    'gemma-300m-embedding-sym': {
+        "name": "gemma-300m-embedding-sym",
+        "version": 1,
+        "url": TRITON_SERVER_URL,
+        "grpc": False
+    },
 }
 
 TOKENIZER_CONFIG = {
@@ -68,7 +80,11 @@ TOKENIZER_CONFIG = {
     'retrieve_context': {
         'name': 'pythera/mbert-retrieve-ctx-base'},
     'rerank': {
-        'name': 'pythera/mbert-rerank-base'}
+        'name': 'pythera/mbert-rerank-base'},
+    'qwen3-retrieve-sym': {
+        'name': 'Qwen/Qwen3-Embedding-0.6B'},
+    'gemma-300m-embedding-sym': {
+        'name': 'onnx-community/embeddinggemma-300m-ONNX'}
 }
     
 
@@ -82,7 +98,8 @@ class ChunkResponse(BaseModel):
     emb:List = Field(..., description='Embedding vector') 
 
 class QueryRequest(BaseModel):
-    text: str = Field(..., decription= 'Query text to process')
+    text: str = Field(..., decription= 'Query text to process'),
+    model_name:str = Field(..., description = 'Model name to use for embedding')
 
 class QueryItem(BaseModel):
     id: str = Field(..., description= 'Query Chunk ID')
@@ -244,6 +261,7 @@ async def process_query(request: QueryRequest):
         
         # Segment query text (if needed)
         chunks = model_manager.segment_text([request.text])
+        model_name = request.model_name
         
         # Process each chunk
         results = []
@@ -256,8 +274,12 @@ async def process_query(request: QueryRequest):
             chunk_id = generate_md5_hash(chunk)
             
             # Get embeddings for chunk
-            embeddings = model_manager.get_query_embeddings([chunk])
-            embeddings = embeddings[0, 0].tolist() # first token only and first batch only
+            embeddings = model_manager.get_query_embeddings([chunk], model_name)
+            # Convert to list - take first batch, all dimensions
+            if embeddings.ndim >= 2:
+                embeddings = embeddings[0].tolist()  # first batch, all embedding dimensions
+            else:
+                embeddings = embeddings.tolist()  # fallback for 1D arrays
 
             results.append(ChunkResponse(
                 id=chunk_id,
